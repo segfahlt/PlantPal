@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using PlantPal.Models;
 
+namespace PlantPal.Controllers;
+
 [ApiController]
 [Route("api/[controller]")]
 public class ScheduleController : ControllerBase

@@ -1,4 +1,7 @@
 using PlantPal.Models;
+using PlantPal.Abstraction;
+
+namespace PlantPal.Services;
 
 public class ScheduleService : IScheduleService
 {

@@ -1,5 +1,7 @@
 using PlantPal.Models;
 
+namespace PlantPal.Abstraction;
+
 public interface IPlantService
 {
     List<Plant> GetAll();
