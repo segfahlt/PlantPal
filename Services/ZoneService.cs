@@ -7,6 +7,16 @@ namespace PlantPal.Services;
 public class ZoneService : IZoneService
 {
 	private readonly List<Zone> _zones = new();
+	private readonly IDataStore _dataStore;
+
+	public ZoneService(IDataStore dataStore)
+	{
+		_dataStore = dataStore;
+		_zones = GetAllZones();
+	}
+
+
+	private List<Zone> GetAllZones() => _dataStore.LoadZones().Result;
 
 	public List<Zone> GetAll() => _zones;
 

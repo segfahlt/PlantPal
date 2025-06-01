@@ -1,3 +1,4 @@
+using PlantPal;
 using PlantPal.Abstraction;
 using PlantPal.Services;
 
@@ -10,7 +11,8 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IPlantService, PlantService>();
 builder.Services.AddSingleton<IScheduleService, ScheduleService>();
 builder.Services.AddSingleton<IZoneService, ZoneService>();
-
+builder.Services.AddSingleton<IDataStore, JsonFileDataStore>();
+builder.Services.AddSingleton<IDataRepoService, DataRepoService>();
 var app = builder.Build();
 
 app.UseSwagger();

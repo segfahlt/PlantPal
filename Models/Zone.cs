@@ -8,5 +8,7 @@ public class Zone
 
 	public List<Plant>? Plants { get; set; } = [];
 
+	public List<Picture>? Pictures { get; set; } = [];
+
 
 }

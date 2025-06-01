@@ -17,5 +17,7 @@ public class Plant
 	public bool IsOutdoor { get; set; } = false;
 	public bool IsPerennial { get; set; } = false;
 	public bool IsAnnual { get; set; } = false;
+	public List<Picture>? Pictures { get; set; } = new();
+
 
 }
