@@ -77,6 +77,19 @@ public class DataRepoService : IDataRepoService
 				var author = new Signature("PlantPal App", "segfahlt@gmail.com", DateTimeOffset.Now);
 				repo.Commit("Updating data and images from PlantPal App", author, author);
 
+				var pushOptions = new PushOptions
+				{
+					// If you have a personal access token, you can set it here
+					CredentialsProvider = (url, usernameFromUrl, types) =>
+					{
+						var pat = Environment.GetEnvironmentVariable(Constants.PlantPalDataPatEnvVariable);
+						return new UsernamePasswordCredentials
+						{
+							Username = "x-access-token",
+							Password = pat ?? string.Empty // Use the PAT from environment variable
+						};
+					}
+				};
 				repo.Network.Push(repo.Branches["master"]);
 			});
 			return true;
