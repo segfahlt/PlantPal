@@ -4,11 +4,11 @@ using System.Reflection.Metadata;
 using System.Text.Json;
 
 using PlantPal.Abstraction;
-using PlantPal.Models;
+using PlantPal.Common;
+using PlantPal.Common.Models;
 
 public class JsonFileDataStore : IDataStore
 {
-	private readonly string _dataPath;
 	private readonly IDataRepoService _dataRepoService;
 	private readonly JsonSerializerOptions _jsonOptions = new()
 	{
@@ -40,7 +40,7 @@ public class JsonFileDataStore : IDataStore
 
 		var fileName = Path.Combine(Constants.DataPath, typeName + ".json");
 		await _dataRepoService.SyncFromRepo();
-		var path = Path.Combine(_dataPath, fileName);
+		var path = Path.Combine(Constants.DataPath, fileName);
 		if (!File.Exists(path)) return Activator.CreateInstance<T>();
 		var json = File.ReadAllText(path);
 
@@ -64,9 +64,12 @@ public class JsonFileDataStore : IDataStore
 			var fileName = Path.Combine(Constants.DataPath, typeName + ".json");
 
 			await _dataRepoService.SyncFromRepo();
-			var path = Path.Combine(_dataPath, fileName);
+			var path = Path.Combine(Constants.DataPath, fileName);
 			var json = JsonSerializer.Serialize(data, _jsonOptions);
 			File.WriteAllText(path, json);
+
+			//TODO: Save images to images directory if needed
+
 			await _dataRepoService.SyncToRepo();
 			return true;
 		}

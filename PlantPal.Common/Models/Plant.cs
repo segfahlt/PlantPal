@@ -1,4 +1,4 @@
-namespace PlantPal.Models;
+namespace PlantPal.Common.Models;
 
 public class Plant
 {

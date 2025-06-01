@@ -1,5 +1,4 @@
-using PlantPal.Models;
-
+using PlantPal.Common.Models;
 
 namespace PlantPal.Abstraction;
 

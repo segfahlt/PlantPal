@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using PlantPal.Models;
+
 using PlantPal.Abstraction;
+using PlantPal.Common.Models;
 
 namespace PlantPal.Controllers;
 

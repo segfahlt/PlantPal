@@ -3,6 +3,8 @@
 using LibGit2Sharp;
 
 using PlantPal.Abstraction;
+using PlantPal.Common;
+
 public class DataRepoService : IDataRepoService
 {
 

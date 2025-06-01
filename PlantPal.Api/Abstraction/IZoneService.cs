@@ -1,6 +1,6 @@
 ﻿namespace PlantPal.Abstraction;
 
-using PlantPal.Models;
+using PlantPal.Common.Models;
 
 public interface IZoneService
 {

@@ -1,5 +1,5 @@
-using PlantPal.Models;
 using PlantPal.Abstraction;
+using PlantPal.Common.Models;
 
 namespace PlantPal.Services;
 

@@ -1,4 +1,4 @@
-﻿namespace PlantPal;
+﻿namespace PlantPal.Common;
 
 public class Constants
 {
