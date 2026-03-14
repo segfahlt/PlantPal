@@ -5,18 +5,23 @@ namespace PlantPal.Services;
 
 public class PlantService : IPlantService
 {
-    private readonly List<Plant> _plants = new();
+	private readonly List<Plant> _plants;
 
-    public List<Plant> GetAll() => _plants;
+	public PlantService(IDataStore dataStore)
+	{
+		_plants = dataStore.LoadPlants().GetAwaiter().GetResult();
+	}
 
-    public Plant? Get(Guid id) => _plants.FirstOrDefault(p => p.Id == id);
+	public List<Plant> GetAll() => _plants;
 
-    public void Add(Plant plant) => _plants.Add(plant);
+	public Plant? Get(Guid id) => _plants.FirstOrDefault(p => p.Id == id);
 
-    public void Remove(Guid id)
-    {
-        var plant = Get(id);
-        if (plant != null)
-            _plants.Remove(plant);
-    }
+	public void Add(Plant plant) => _plants.Add(plant);
+
+	public void Remove(Guid id)
+	{
+		var plant = Get(id);
+		if (plant != null)
+			_plants.Remove(plant);
+	}
 }

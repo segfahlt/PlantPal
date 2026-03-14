@@ -3,12 +3,22 @@
 public class Picture
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
-	public DateTime TakenAt { get; set; } = DateTime.UtcNow;
-	public string FileName { get; set; } = string.Empty;      // e.g., "zone1_2025-05-31.jpg"
+	public DateTime TakenAtUtc { get; set; } = DateTime.UtcNow;
+	public string FileName { get; set; } = string.Empty;
+	public string? RelativePath { get; set; }
 	public string? Caption { get; set; }
-	public string? Base64Data { get; set; }                   // optional, only if stored inline
-	public Guid? ZoneId { get; set; } = null; // optional, if picture is associated with a zone
-	public Guid? PlantId { get; set; } = null; // optional, if picture is associated with a plant
-	public string SHA1Hath { get; set; } = string.Empty; // SHA1 hash of the file content for integrity check
+	public string? MimeType { get; set; }
+	public string? Base64Data { get; set; }
+	public Guid? ZoneId { get; set; }
+	public Guid? PlantId { get; set; }
+	public Guid? ObservationId { get; set; }
+	public string? Sha1Hash { get; set; }
+	public int? Width { get; set; }
+	public int? Height { get; set; }
+	public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+	public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+	public DateTime? DeletedAtUtc { get; set; }
+	public int Version { get; set; } = 1;
+	public string? SourceDeviceId { get; set; }
 
 }

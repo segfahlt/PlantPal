@@ -1,6 +1,6 @@
-﻿namespace PlantPal.Services;
+namespace PlantPal.Services;
 
-using System.Reflection.Metadata;
+using System.Text;
 using System.Text.Json;
 
 using PlantPal.Abstraction;
@@ -21,63 +21,198 @@ public class JsonFileDataStore : IDataStore
 		_dataRepoService = dataRepoService;
 	}
 
-	public async Task<List<Zone>> LoadZones() => await LoadData<List<Zone>>();
-	public async Task<bool> SaveZones(List<Zone> zones) => await SaveData(zones);
-
-	public async Task<List<Plant>> LoadPlants() => await LoadData<List<Plant>>();
-	public async Task<bool> SavePlants(List<Plant> plants) => await SaveData(plants);
-
-	private async Task<T> LoadData<T>()
+	public async Task<List<Zone>> LoadZones()
 	{
-		var typeName = string.Empty;
-		var type = typeof(T);
-
-		if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
-		{
-			var itemType = type.GetGenericArguments()[0];
-			typeName = itemType.Name;
-		}
-
-		var fileName = Path.Combine(Constants.DataPath, typeName + ".json");
 		await _dataRepoService.SyncFromRepo();
-		var path = Path.Combine(Constants.DataPath, fileName);
-		if (!File.Exists(path)) return Activator.CreateInstance<T>();
-		var json = File.ReadAllText(path);
-
-		//TODO: read images from images directory
-		return JsonSerializer.Deserialize<T>(json, _jsonOptions) ?? Activator.CreateInstance<T>();
+		return LoadZonesFromDisk();
 	}
 
-	private async Task<bool> SaveData<T>(T data)
+	public async Task<bool> SaveZones(List<Zone> zones)
 	{
 		try
 		{
-			var typeName = string.Empty;
-			var type = typeof(T);
+			await _dataRepoService.SyncFromRepo();
+			var zonesPath = Constants.GetZonesPath();
+			Directory.CreateDirectory(zonesPath);
 
-			if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+			foreach (var zone in zones)
 			{
-				var itemType = type.GetGenericArguments()[0];
-				typeName = itemType.Name;
+				var zoneDirectory = Path.Combine(zonesPath, CreateSlug(zone.Name));
+				Directory.CreateDirectory(zoneDirectory);
+
+				var path = Path.Combine(zoneDirectory, "zone.json");
+				var json = JsonSerializer.Serialize(ToZoneRecord(zone), _jsonOptions);
+				await File.WriteAllTextAsync(path, json, Encoding.UTF8);
 			}
 
-			var fileName = Path.Combine(Constants.DataPath, typeName + ".json");
-
-			await _dataRepoService.SyncFromRepo();
-			var path = Path.Combine(Constants.DataPath, fileName);
-			var json = JsonSerializer.Serialize(data, _jsonOptions);
-			File.WriteAllText(path, json);
-
-			//TODO: Save images to images directory if needed
-
-			await _dataRepoService.SyncToRepo();
-			return true;
+			return await _dataRepoService.SyncToRepo();
 		}
-		catch (Exception ex)
+		catch
 		{
-			//TODO: Log it.
 			return false;
 		}
+	}
 
+	public async Task<List<Plant>> LoadPlants()
+	{
+		await _dataRepoService.SyncFromRepo();
+
+		var zones = LoadZonesFromDisk();
+		var zoneLookup = zones.ToDictionary(zone => zone.Id);
+		var plants = LoadRecords<Plant>(Constants.GetPlantsPath(), "plant.json");
+
+		foreach (var plant in plants)
+		{
+			plant.Zone = null;
+
+			if (plant.ZoneId is Guid zoneId && zoneLookup.TryGetValue(zoneId, out var zone))
+				plant.Zone = zone;
+		}
+
+		return plants;
+	}
+
+	public async Task<bool> SavePlants(List<Plant> plants)
+	{
+		try
+		{
+			await _dataRepoService.SyncFromRepo();
+			var plantsPath = Constants.GetPlantsPath();
+			Directory.CreateDirectory(plantsPath);
+
+			foreach (var plant in plants)
+			{
+				var speciesDirectory = Path.Combine(plantsPath, CreateSlug(plant.ScientificName ?? plant.Name));
+				var plantDirectory = Path.Combine(speciesDirectory, CreatePlantSlug(plant));
+				Directory.CreateDirectory(plantDirectory);
+
+				var path = Path.Combine(plantDirectory, "plant.json");
+				var json = JsonSerializer.Serialize(ToPlantRecord(plant), _jsonOptions);
+				await File.WriteAllTextAsync(path, json, Encoding.UTF8);
+			}
+
+			return await _dataRepoService.SyncToRepo();
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	private List<Zone> LoadZonesFromDisk() =>
+		LoadRecords<Zone>(Constants.GetZonesPath(), "zone.json");
+
+	private List<T> LoadRecords<T>(string rootPath, string fileName) where T : class
+	{
+		if (!Directory.Exists(rootPath))
+			return [];
+
+		return Directory
+			.EnumerateFiles(rootPath, fileName, SearchOption.AllDirectories)
+			.Select(ReadRecord<T>)
+			.Where(record => record is not null)
+			.Cast<T>()
+			.Where(IsActiveRecord)
+			.ToList();
+	}
+
+	private T? ReadRecord<T>(string path) where T : class
+	{
+		var json = File.ReadAllText(path);
+		return JsonSerializer.Deserialize<T>(json, _jsonOptions);
+	}
+
+	private static bool IsActiveRecord<T>(T record) where T : class =>
+		record switch
+		{
+			Zone zone => zone.DeletedAtUtc is null,
+			Plant plant => plant.DeletedAtUtc is null,
+			_ => true
+		};
+
+	private static string CreatePlantSlug(Plant plant)
+	{
+		var shortId = plant.Id.ToString("N")[..8];
+		return $"{CreateSlug(plant.Name)}--{shortId}";
+	}
+
+	private static object ToZoneRecord(Zone zone) => new
+	{
+		zone.Id,
+		zone.Name,
+		zone.Description,
+		zone.ParentZoneId,
+		zone.Latitude,
+		zone.Longitude,
+		zone.GeoRadiusMeters,
+		zone.SunExposure,
+		zone.SoilNotes,
+		zone.Tags,
+		zone.CreatedAtUtc,
+		zone.UpdatedAtUtc,
+		zone.DeletedAtUtc,
+		zone.Version,
+		zone.SourceDeviceId
+	};
+
+	private static object ToPlantRecord(Plant plant) => new
+	{
+		plant.Id,
+		plant.Name,
+		plant.CommonName,
+		plant.ScientificName,
+		plant.ZoneId,
+		plant.Description,
+		plant.Notes,
+		plant.PlantedDate,
+		plant.Status,
+		plant.LifeCycle,
+		plant.Environment,
+		plant.Latitude,
+		plant.Longitude,
+		plant.GpsAccuracyMeters,
+		plant.PrimaryPictureId,
+		plant.Tags,
+		CareEvents = plant.CareEvents.Select(careEvent => new
+		{
+			careEvent.Id,
+			careEvent.Type,
+			careEvent.IntervalDays,
+			careEvent.Notes,
+			careEvent.StartDateUtc,
+			careEvent.IsActive
+		}),
+		plant.CreatedAtUtc,
+		plant.UpdatedAtUtc,
+		plant.DeletedAtUtc,
+		plant.Version,
+		plant.SourceDeviceId
+	};
+
+	private static string CreateSlug(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+			return "unknown";
+
+		var builder = new StringBuilder(value.Length);
+		var previousWasDash = false;
+
+		foreach (var character in value.Trim().ToLowerInvariant())
+		{
+			if (char.IsLetterOrDigit(character))
+			{
+				builder.Append(character);
+				previousWasDash = false;
+				continue;
+			}
+
+			if (previousWasDash)
+				continue;
+
+			builder.Append('-');
+			previousWasDash = true;
+		}
+
+		return builder.ToString().Trim('-');
 	}
 }

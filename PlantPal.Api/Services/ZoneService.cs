@@ -16,7 +16,7 @@ public class ZoneService : IZoneService
 	}
 
 
-	private List<Zone> GetAllZones() => _dataStore.LoadZones().Result;
+	private List<Zone> GetAllZones() => _dataStore.LoadZones().GetAwaiter().GetResult();
 
 	public List<Zone> GetAll() => _zones;
 

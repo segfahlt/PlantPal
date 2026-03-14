@@ -1,4 +1,4 @@
-﻿namespace PlantPal.Services;
+namespace PlantPal.Services;
 
 using LibGit2Sharp;
 
@@ -7,42 +7,25 @@ using PlantPal.Common;
 
 public class DataRepoService : IDataRepoService
 {
-
 	public async Task<bool> SyncFromRepo()
 	{
-		//The Repo URL is a Github URL. We want to use the LibGit2 library for repository manipulation.
 		try
 		{
-			var repoPath = Constants.RepoPath;
-			var repoName = Path.GetFileNameWithoutExtension(Constants.DataRepoUrl);
-
-			if (!Directory.Exists(repoPath))
-			{
-				Directory.CreateDirectory(repoPath);
-				Repository.Clone(Constants.DataRepoUrl, repoPath);
-			}
+			var repoPath = EnsureRepositoryExists();
 
 			using var repo = new Repository(repoPath);
-
 			await Task.Run(() =>
 			{
-				//okay, now ensure we are on the master branch (TODO: make this configurable)
-				if (repo.Head.FriendlyName != "master")
-					Commands.Checkout(repo, repo.Branches["master"]);
-
-				//now do a pull
-				var options = new PullOptions
-				{
-					FetchOptions = new FetchOptions
-					{
-						Prune = true // Clean up deleted branches
-					}
-				};
+				var branch = EnsureWorkingBranch(repo);
+				Commands.Checkout(repo, branch);
 
 				Commands.Pull(
 					repo,
 					new Signature("PlantPal", "segfahlt@gmail.com", DateTimeOffset.Now),
-					options);
+					new PullOptions
+					{
+						FetchOptions = CreateFetchOptions()
+					});
 			});
 
 			return true;
@@ -53,47 +36,30 @@ public class DataRepoService : IDataRepoService
 			return false;
 		}
 	}
+
 	public async Task<bool> SyncToRepo()
 	{
-		//The Repo URL is a Github URL. We want to use the LibGit2 library for repository manipulation.
 		try
 		{
-			var repoPath = Constants.RepoPath;
-			var repoName = Path.GetFileNameWithoutExtension(Constants.DataRepoUrl);
-
-			if (!Directory.Exists(repoPath))
-				throw new Exception("Repository path does not exist. Have to BAIL");
+			var repoPath = Constants.GetRepoPath();
+			if (!Directory.Exists(repoPath) || !Repository.IsValid(repoPath))
+				throw new InvalidOperationException("Repository path does not exist.");
 
 			using var repo = new Repository(repoPath);
-
 			await Task.Run(() =>
 			{
-				//okay, now ensure we are on the master branch (TODO: make this configurable)
-				if (repo.Head.FriendlyName != "master")
-					Commands.Checkout(repo, repo.Branches["master"]);
+				var branch = EnsureWorkingBranch(repo);
+				Commands.Checkout(repo, branch);
+				Commands.Stage(repo, "*");
 
-				//We should have already pulled, so let's pretend we're in sync.
-				//the .json files will have been saved so we should assume we need to add, commit, push.
+				if (!repo.RetrieveStatus().IsDirty)
+					return;
 
-				Commands.Stage(repo, "*"); // Stage all changes
 				var author = new Signature("PlantPal App", "segfahlt@gmail.com", DateTimeOffset.Now);
 				repo.Commit("Updating data and images from PlantPal App", author, author);
-
-				var pushOptions = new PushOptions
-				{
-					// If you have a personal access token, you can set it here
-					CredentialsProvider = (url, usernameFromUrl, types) =>
-					{
-						var pat = Environment.GetEnvironmentVariable(Constants.PlantPalDataPatEnvVariable);
-						return new UsernamePasswordCredentials
-						{
-							Username = "x-access-token",
-							Password = pat ?? string.Empty // Use the PAT from environment variable
-						};
-					}
-				};
-				repo.Network.Push(repo.Branches["master"]);
+				repo.Network.Push(branch, CreatePushOptions());
 			});
+
 			return true;
 		}
 		catch (Exception ex)
@@ -103,4 +69,77 @@ public class DataRepoService : IDataRepoService
 		}
 	}
 
+	private static string EnsureRepositoryExists()
+	{
+		var repoPath = Constants.GetRepoPath();
+		if (Repository.IsValid(repoPath))
+			return repoPath;
+
+		Directory.CreateDirectory(repoPath);
+		Repository.Clone(Constants.GetDataRepoUrl(), repoPath);
+		return repoPath;
+	}
+
+	private static Branch EnsureWorkingBranch(Repository repo)
+	{
+		var preferredBranchName =
+			repo.Branches["main"] is not null || repo.Branches["origin/main"] is not null
+				? "main"
+				: "master";
+
+		var localBranch = repo.Branches[preferredBranchName];
+		if (localBranch is not null)
+			return localBranch;
+
+		var remoteBranch = repo.Branches[$"origin/{preferredBranchName}"]
+			?? throw new InvalidOperationException("Unable to determine the data repo branch.");
+
+		localBranch = repo.CreateBranch(preferredBranchName, remoteBranch.Tip);
+		repo.Branches.Update(localBranch, branch => branch.TrackedBranch = remoteBranch.CanonicalName);
+		return localBranch;
+	}
+
+	private static FetchOptions CreateFetchOptions()
+	{
+		var options = new FetchOptions
+		{
+			Prune = true
+		};
+
+		ApplyCredentials(options);
+		return options;
+	}
+
+	private static PushOptions CreatePushOptions()
+	{
+		var options = new PushOptions();
+		ApplyCredentials(options);
+		return options;
+	}
+
+	private static void ApplyCredentials(FetchOptions options)
+	{
+		var pat = Environment.GetEnvironmentVariable(Constants.PlantPalDataPatEnvVariable);
+		if (string.IsNullOrWhiteSpace(pat))
+			return;
+
+		options.CredentialsProvider = (_, _, _) => new UsernamePasswordCredentials
+		{
+			Username = "x-access-token",
+			Password = pat
+		};
+	}
+
+	private static void ApplyCredentials(PushOptions options)
+	{
+		var pat = Environment.GetEnvironmentVariable(Constants.PlantPalDataPatEnvVariable);
+		if (string.IsNullOrWhiteSpace(pat))
+			return;
+
+		options.CredentialsProvider = (_, _, _) => new UsernamePasswordCredentials
+		{
+			Username = "x-access-token",
+			Password = pat
+		};
+	}
 }
